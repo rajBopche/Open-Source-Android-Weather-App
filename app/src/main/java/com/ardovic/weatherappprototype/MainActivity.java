@@ -11,35 +11,26 @@ import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
-import androidx.annotation.NonNull;
 import android.text.TextUtils;
 import android.util.Log;
-import android.view.View;
-import android.widget.AdapterView;
-import android.widget.AutoCompleteTextView;
-import android.widget.FilterQueryProvider;
-import android.widget.ImageView;
-import android.widget.SimpleCursorAdapter;
-import android.widget.TextView;
-import android.widget.Toast;
-
+import android.widget.*;
+import androidx.annotation.NonNull;
+import butterknife.BindView;
+import butterknife.ButterKnife;
 import com.ardovic.weatherappprototype.model.IJ;
 import com.ardovic.weatherappprototype.model.retrofit.Response;
 import com.ardovic.weatherappprototype.util.ImageHelper;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.stream.JsonReader;
+import okhttp3.ResponseBody;
+import retrofit2.Call;
+import retrofit2.Callback;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
-
-import butterknife.BindView;
-import butterknife.ButterKnife;
-import okhttp3.ResponseBody;
-import retrofit2.Call;
-import retrofit2.Callback;
 
 import static com.ardovic.weatherappprototype.network.WeatherApi.API_KEY;
 
@@ -69,8 +60,7 @@ public class MainActivity extends BaseActivity implements LoaderManager.LoaderCa
     public final static String[] mProjection = {ID, CITY_COUNTRY_NAME};
     private static final String TAG = "MainActivity";
     private static final String CITY_ARGS = "city_weather_arg";
-    //FetchThreadData<Integer> mFetchThreadData;
-    //private Handler mHandler = new Handler();
+
     public String cityCountryName;
 
     public SimpleCursorAdapter mAdapter;
@@ -78,10 +68,9 @@ public class MainActivity extends BaseActivity implements LoaderManager.LoaderCa
     @Override
     protected void onStart() {
         super.onStart();
-        if (!cityCountryName.equals("")) {
+        if (!cityCountryName.equals(""))
             requestWeather();
-            //mFetchThreadData.queueResponce(0, cityCountryName);
-        }
+
     }
 
     @Override
@@ -92,71 +81,15 @@ public class MainActivity extends BaseActivity implements LoaderManager.LoaderCa
 
         cityCountryName = sharedPreferences.getString(CITY_COUNTRY_NAME, "");
         actvCityCountryName.setText(cityCountryName);
-        //mFetchThreadData = new FetchThreadData<>(mHandler);
-        //mFetchThreadData.start();
-        //mFetchThreadData.getLooper();
-        //initServerResponse();
-
-
-        //JSONConverter.getInstance().makeNewShortJSON(this, null, null, null);
-
         if (database.isOpen()) {
-            checkDatabaseState();
+            checkDatabaseState();   //this method should be handled by presenter
         } else {
             database = databaseHelper.getReadableDatabase();
             checkDatabaseState();
         }
-
-
-        // Create a SimpleCursorAdapter for the State Name field.
-        mAdapter = new SimpleCursorAdapter(this,
-                R.layout.dropdown_text,
-                null,
-                new String[]{CITY_COUNTRY_NAME},
-                new int[]{R.id.text}, 0);
-        mAdapter.setFilterQueryProvider(new FilterQueryProvider() {
-            @Override
-            public Cursor runQuery(CharSequence constraint) {
-                if (constraint != null) {
-                    if (constraint.length() >= 3 && !TextUtils.isEmpty(constraint)) {
-                        Bundle bundle = new Bundle();
-                        String query = charArrayUpperCaser(constraint);
-                        bundle.putString(CITY_ARGS, query);
-                        getLoaderManager().restartLoader(0, bundle, MainActivity.this).forceLoad();
-                    }
-                }
-                return null;
-            }
-        });
-
-        // Set an OnItemClickListener, to update dependent fields when
-        // a choice is made in the AutoCompleteTextView.
-        actvCityCountryName.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            public void onItemClick(AdapterView<?> listView, View view,
-                                    int position, long id) {
-                // Get the cursor, positioned to the corresponding row in the
-                // result set
-                Cursor cursor = (Cursor) listView.getItemAtPosition(position);
-
-                // Get the state's capital from this row in the database.
-                cityCountryName = cursor.getString(cursor.getColumnIndexOrThrow(CITY_COUNTRY_NAME));
-
-                // Update the parent class's TextView
-                actvCityCountryName.setText(cityCountryName);
-
-                requestWeather();
-                //mFetchThreadData.queueResponce(position, cityCountryName);
-
-//                JSONWeatherTask task = new JSONWeatherTask();
-//                task.execute(new String[]{cityCountryName});
-
-                hideKeyboard();
-            }
-        });
-
+        createCityCountryAdapter();
+        setActvCityCountryNameListener();
         actvCityCountryName.setAdapter(mAdapter);
-
-
     }
 
     @Override
@@ -166,7 +99,7 @@ public class MainActivity extends BaseActivity implements LoaderManager.LoaderCa
 
     }
 
-    public void createLocalCityDB() {
+    public void createLocalCityDB() { //this method should be handled by presenter, this method reads data from Json file and store in Db
 
         int i = 0;
 
@@ -216,6 +149,26 @@ public class MainActivity extends BaseActivity implements LoaderManager.LoaderCa
         }
     }
 
+    private void createCityCountryAdapter() {
+        // Create a SimpleCursorAdapter for the State Name field.
+        mAdapter = new SimpleCursorAdapter(this,
+                R.layout.dropdown_text,
+                null,
+                new String[]{CITY_COUNTRY_NAME},
+                new int[]{R.id.text}, 0);
+        mAdapter.setFilterQueryProvider(constraint -> {
+            if (constraint != null) {
+                if (constraint.length() >= 3 && !TextUtils.isEmpty(constraint)) {
+                    Bundle bundle = new Bundle();
+                    String query = charArrayUpperCaser(constraint);
+                    bundle.putString(CITY_ARGS, query);
+                    getLoaderManager().restartLoader(0, bundle, MainActivity.this).forceLoad();
+                }
+            }
+            return null;
+        });
+    }
+
     @Override
     public android.content.Loader<Cursor> onCreateLoader(int id, Bundle args) {
         String s = args.getString(CITY_ARGS);
@@ -245,7 +198,6 @@ public class MainActivity extends BaseActivity implements LoaderManager.LoaderCa
             mAdapter.getCursor().close();
         }
         database.close();
-        //mFetchThreadData.clearQueue();
     }
 
 
@@ -277,7 +229,7 @@ public class MainActivity extends BaseActivity implements LoaderManager.LoaderCa
         return s;
     }
 
-    private void checkDatabaseState() {
+    private void checkDatabaseState() { //this method should be handled by presenter
         if (databaseHelper.isTableExists(database, TABLE_1)) {
             long count = DatabaseUtils.queryNumEntries(database, TABLE_1);
             System.out.println(count);
@@ -295,7 +247,28 @@ public class MainActivity extends BaseActivity implements LoaderManager.LoaderCa
         }
     }
 
-    private void requestWeather() {
+    private void setActvCityCountryNameListener() {
+        // Set an OnItemClickListener, to update dependent fields when
+        // a choice is made in the AutoCompleteTextView.
+        actvCityCountryName.setOnItemClickListener((listView, view, position, id) -> { //need to make it clean
+            // Get the cursor, positioned to the corresponding row in the
+            // result set
+            Cursor cursor = (Cursor) listView.getItemAtPosition(position);
+
+            // Get the state's capital from this row in the database.
+            cityCountryName = cursor.getString(cursor.getColumnIndexOrThrow(CITY_COUNTRY_NAME));
+
+            // Update the parent class's TextView
+            actvCityCountryName.setText(cityCountryName);
+
+            requestWeather();
+
+            hideKeyboard();
+        });
+    }
+
+
+    private void requestWeather() {  //this method should be handled by presenter
         weatherApi.getWeather(cityCountryName, API_KEY).enqueue(new Callback<Response>() {
             @SuppressLint("SetTextI18n")
             @Override
@@ -306,7 +279,7 @@ public class MainActivity extends BaseActivity implements LoaderManager.LoaderCa
                     Log.d(TAG, model.toString());
 
                     tvCityCountryName.setText(model.getName() + ", " + model.getSys().getCountry());
-                    tvConditionDescription.setText(model.getWeather().get(0).getMain() + " (" +(model.getWeather().get(0).getDescription() + ")"));
+                    tvConditionDescription.setText(model.getWeather().get(0).getMain() + " (" + (model.getWeather().get(0).getDescription() + ")"));
                     tvTemperature.setText("" + Math.round((model.getMain().getTemp() - 273.15)) + (char) 0x00B0 + "C");
                     tvHumidity.setText(model.getMain().getHumidity() + "%");
                     tvPressure.setText(model.getMain().getPressure() + " hPa");
@@ -325,10 +298,9 @@ public class MainActivity extends BaseActivity implements LoaderManager.LoaderCa
         });
     }
 
-    /**
-     * BitmapFactory.decodeStream method needs background thread
-     */
-    private void requestWeatherIcon(Response model) {
+    /*** BitmapFactory.decodeStream method needs background thread*/
+
+    private void requestWeatherIcon(Response model) { //this method should be handled by presenter
         weatherApi.getIcon(model.getWeather().get(0).getIcon()).enqueue(new Callback<ResponseBody>() {
             @Override
             public void onResponse(@NonNull Call<ResponseBody> call, final @NonNull retrofit2.Response<ResponseBody> response) {
@@ -361,26 +333,6 @@ public class MainActivity extends BaseActivity implements LoaderManager.LoaderCa
             }
         });
     }
-
-    /*private void initServerResponse() {
-        mFetchThreadData.setWeatherFetchListener(new FetchThreadData.WeatherFetchListener<Integer>() {
-            @Override
-            public void onDataFetched(Integer o, Weather weather) {
-                if (weather != null) {
-                    ivConditionIcon.setImageBitmap(weather.getIcon());
-                    tvCityCountryName.setText(weather.getLocation().getCity() + ", " + weather.getLocation().getCountry());
-                    tvConditionDescription.setText(weather.getCurrentCondition().getCondition() + " (" + weather.getCurrentCondition().getDescription() + ")");
-                    tvTemperature.setText(", " + Math.round((weather.getTemperature().getTemperature() - 273.15)) + (char) 0x00B0 + "C");
-                    tvHumidity.setText(weather.getCurrentCondition().getHumidity() + "%");
-                    tvPressure.setText(weather.getCurrentCondition().getPressure() + " hPa");
-                    tvWindSpeedDegrees.setText(weather.getWind().getSpeed() + " mps, " + weather.getWind().getDegrees() + (char) 0x00B0);
-                } else {
-                    Toast.makeText(MainActivity.this, "Check internet connection or try again later", Toast.LENGTH_SHORT)
-                            .show();
-                }
-            }
-        });
-    }*/
 }
 
 
